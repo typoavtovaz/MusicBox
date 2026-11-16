@@ -16,9 +16,23 @@ android {
         versionName = "0.2-playback"
     }
 
+    signingConfigs {
+        // Постоянный ключ, чтобы обновления ставились поверх старой версии
+        create("stable") {
+            storeFile = file("musicbox.jks")
+            storePassword = "musicbox123"
+            keyAlias = "musicbox"
+            keyPassword = "musicbox123"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("stable")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("stable")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
