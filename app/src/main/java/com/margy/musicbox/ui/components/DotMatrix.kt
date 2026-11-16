@@ -13,25 +13,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import com.margy.musicbox.ui.theme.NothingRed
-import com.margy.musicbox.ui.theme.NothingWhite
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Волна из точек в стиле Nothing: столбики из красно-белых пиксельных точек.
- * Играет — бежит, пауза — замирает в низкой полке.
+ * Волна из точек. Если пришёл реальный спектр (levels) — столбики рисуются по нему:
+ * слева бас, справа верха, всё честно дёргается под трек.
+ * Если спектра нет (пауза/нет разрешения) — тихая синтетическая полка.
  */
 @Composable
 fun DotMatrixWave(
+    levels: FloatArray,
     playing: Boolean,
     modifier: Modifier = Modifier,
-    energy: Float = 0.65f,
     columns: Int = 28,
-    rows: Int = 12,
-    dimWhenStopped: Boolean = true
+    rows: Int = 12
 ) {
     val transition = rememberInfiniteTransition(label = "wave")
     val phase by transition.animateFloat(
@@ -44,58 +42,54 @@ fun DotMatrixWave(
         label = "phase"
     )
 
-    val p = if (playing) phase else 0f
-    val energyFactor = energy.coerceIn(0.15f, 1f)
+    val live = levels.isNotEmpty()
+    val cols = if (live) levels.size else columns
 
-    Canvas(
-        modifier = modifier.fillMaxWidth()
-    ) {
-        val stepX = size.width / columns
+    Canvas(modifier = modifier.fillMaxWidth()) {
+        val stepX = size.width / cols
         val stepY = size.height / rows
         val dot = minOf(stepX, stepY) * 0.30f
 
-        for (col in 0 until columns) {
-            // Две синусоиды + косинус = живая, но всё же ритмичная волна
-            val wobble = abs(sin(col * 0.42f + p * 0.9f)) * 0.65f +
-                abs(cos(col * 0.23f - p * 0.55f)) * 0.35f
-
-            val idle = 0.16f
-            val height = if (playing) {
-                (idle + wobble * energyFactor * 0.84f).coerceIn(0.05f, 1f)
+        for (col in 0 until cols) {
+            val value = if (live) {
+                levels[col].coerceIn(0f, 1f)
             } else {
-                idle
+                val wobble = abs(sin(col * 0.42f + phase * 0.9f)) * 0.65f +
+                    abs(cos(col * 0.23f - phase * 0.55f)) * 0.35f
+                if (playing) (0.12f + wobble * 0.55f) else 0.06f
             }
 
-            val filled = (rows * height).toInt().coerceIn(1, rows)
+            val filled = (rows * value).toInt().coerceIn(1, rows)
             val cx = stepX * (col + 0.5f)
 
             for (row in 0 until rows) {
-                val fromBottom = row < filled
+                val active = row < filled
                 val y = size.height - stepY * (row + 0.5f)
 
-                val color: Color = when {
-                    fromBottom && (col + row) % 3 == 0 -> NothingRed
-                    fromBottom -> NothingWhite
-                    !dimWhenStopped && !playing -> NothingWhite.copy(alpha = 0.06f)
-                    else -> NothingWhite.copy(alpha = 0.10f)
+                val color = when {
+                    !active -> NothingRed.copy(alpha = 0.07f)
+                    // макушка столбика — самая яркая, низ мягче
+                    row >= filled - 2 -> NothingRed.copy(alpha = 1f)
+                    else -> NothingRed.copy(alpha = 0.55f)
                 }
 
-                // верхние точки чуть меньше — сглаживает «пилу»
-                val r = if (fromBottom) dot else dot * 0.7f
-                drawCircle(color = color, radius = r, center = Offset(cx, y))
+                drawCircle(
+                    color = color,
+                    radius = if (active) dot else dot * 0.68f,
+                    center = Offset(cx, y)
+                )
             }
         }
     }
 }
 
-/** Тонкая строка из точек — разделитель в стиле Nothing. */
 @Composable
-fun DotDivider(modifier: Modifier = Modifier, color: Color = NothingWhite) {
-    Canvas(modifier = modifier.fillMaxWidth().then(Modifier)) {
-        val step = 8.dp.toPx()
+fun DotDivider(modifier: Modifier = Modifier, color: Color = NothingRed) {
+    Canvas(modifier = modifier.fillMaxWidth()) {
+        val step = 8f * density
         var x = 0f
         while (x < size.width) {
-            drawCircle(color.copy(alpha = 0.25f), radius = 1f, center = Offset(x, size.height / 2f))
+            drawCircle(color.copy(alpha = 0.18f), radius = 1f * density, center = Offset(x, size.height / 2f))
             x += step
         }
     }

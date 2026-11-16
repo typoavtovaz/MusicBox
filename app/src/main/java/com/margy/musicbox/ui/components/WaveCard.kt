@@ -38,11 +38,13 @@ import com.margy.musicbox.ui.theme.NothingWhite
 @Composable
 fun WaveCard(
     playing: Boolean,
+    levels: FloatArray,
     onToggle: () -> Unit,
     onStop: () -> Unit,
     onEdit: () -> Unit,
     modifier: Modifier = Modifier,
-    moodLabel: String = "подстроена под тебя"
+    moodLabel: String = "подстроена под тебя",
+    statusText: String? = null
 ) {
     Column(
         modifier = modifier
@@ -76,19 +78,24 @@ fun WaveCard(
         Spacer(Modifier.height(10.dp))
 
         Text(
-            text = moodLabel,
+            text = statusText ?: moodLabel,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (statusText != null && statusText.contains("не")) {
+                NothingRed
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            maxLines = 2
         )
 
         Spacer(Modifier.height(14.dp))
 
         DotMatrixWave(
+            levels = levels,
             playing = playing,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(104.dp),
-            energy = if (playing) 0.85f else 0.4f
+                .height(104.dp)
         )
 
         Spacer(Modifier.height(16.dp))
@@ -101,14 +108,14 @@ fun WaveCard(
                 modifier = Modifier
                     .size(56.dp)
                     .clip(CircleShape)
-                    .background(if (playing) NothingWhite else NothingRed)
+                    .background(if (playing) NothingRed else NothingWhite)
                     .clickable { onToggle() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                     contentDescription = "волна",
-                    tint = if (playing) Color.Black else NothingWhite,
+                    tint = if (playing) NothingWhite else Color.Black,
                     modifier = Modifier.size(30.dp)
                 )
             }

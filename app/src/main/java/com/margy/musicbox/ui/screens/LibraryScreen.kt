@@ -28,6 +28,7 @@ import com.margy.musicbox.core.model.Demo
 import com.margy.musicbox.core.model.Source
 import com.margy.musicbox.core.model.Track
 import com.margy.musicbox.ui.components.Artwork
+import com.margy.musicbox.ui.components.DotText
 import com.margy.musicbox.ui.components.IconButtonBare
 import com.margy.musicbox.ui.components.SectionTitle
 import com.margy.musicbox.ui.components.TrackRow
@@ -43,12 +44,11 @@ fun LibraryScreen(
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "Библиотека",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.weight(1f)
+                DotText(
+                    text = "БИБЛИОТЕКА",
+                    modifier = Modifier.weight(1f),
+                    height = 30.dp,
+                    color = Color.White
                 )
                 IconButtonBare(
                     icon = Icons.Rounded.Settings,

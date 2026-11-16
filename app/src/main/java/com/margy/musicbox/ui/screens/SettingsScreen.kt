@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.margy.musicbox.core.model.Source
+import com.margy.musicbox.ui.components.DotText
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
@@ -49,13 +50,12 @@ fun SettingsScreen(onBack: () -> Unit) {
                     tint = MaterialTheme.colorScheme.onBackground
                 )
             }
-            Text(
-                "Настройки",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-        }
+            DotText(
+                text = "НАСТРОЙКИ",
+                modifier = Modifier.weight(1f),
+                height = 26.dp,
+                color = Color.White
+            )        }
 
         Spacer(Modifier.height(16.dp))
         Text(

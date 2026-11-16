@@ -43,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.margy.musicbox.ui.components.DotText
 import com.margy.musicbox.ui.components.NothingChip
 import com.margy.musicbox.ui.theme.NothingLine
 import com.margy.musicbox.ui.theme.NothingRed
@@ -88,12 +89,12 @@ fun WaveEditorScreen(
                     tint = NothingWhite
                 )
             }
-            Text(
-                "РЕДАКТОР ВОЛНЫ",
-                style = MaterialTheme.typography.titleMedium,
+            DotText(
+                text = "РЕДАКТОР ВОЛНЫ",
+                modifier = Modifier.weight(1f),
+                height = 22.dp,
                 color = NothingWhite
-            )
-        }
+            )        }
 
         LazyColumn(
             modifier = Modifier

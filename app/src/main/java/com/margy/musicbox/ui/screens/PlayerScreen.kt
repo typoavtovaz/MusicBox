@@ -4,10 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -28,23 +29,28 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.margy.musicbox.core.model.Demo
-import com.margy.musicbox.core.model.Track
+import com.margy.musicbox.playback.PlaybackUi
 import com.margy.musicbox.ui.components.Artwork
+import com.margy.musicbox.ui.components.DotText
 import com.margy.musicbox.ui.components.IconButtonBare
 import com.margy.musicbox.ui.components.gradientFor
 import com.margy.musicbox.ui.components.sourceShort
 
 @Composable
 fun PlayerScreen(
-    track: Track,
-    playing: Boolean,
+    playback: PlaybackUi,
     onClose: () -> Unit,
     onToggle: () -> Unit,
+    onSeek: (Long) -> Unit,
     onNext: () -> Unit,
-    onPrev: () -> Unit,
-    onLike: () -> Unit
+    onPrev: () -> Unit
 ) {
-    var position by remember(track.key) { mutableFloatStateOf(0.3f) }
+    val track = playback.track ?: return
+    val duration = playback.durationMs.coerceAtLeast(1L)
+
+    var dragging by remember { mutableStateOf(false) }
+    var dragValue by remember { mutableFloatStateOf(0f) }
+    val fraction = if (dragging) dragValue else (playback.positionMs.toFloat() / duration).coerceIn(0f, 1f)
 
     Box(
         modifier = Modifier
@@ -52,14 +58,14 @@ fun PlayerScreen(
             .background(gradientFor(track.key))
     ) {
         Box(
-            modifier = Modifier
+            Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         listOf(
                             Color.Black.copy(alpha = 0.55f),
-                            Color.Black.copy(alpha = 0.9f),
-                            Color(0xFF0B0D11)
+                            Color.Black.copy(alpha = 0.92f),
+                            Color.Black
                         )
                     )
                 )
@@ -75,7 +81,6 @@ fun PlayerScreen(
                 .padding(top = 8.dp, bottom = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Шапка
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -104,7 +109,7 @@ fun PlayerScreen(
                 )
             }
 
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(24.dp))
 
             Artwork(
                 seed = track.key,
@@ -115,18 +120,15 @@ fun PlayerScreen(
                 iconSize = 64.dp
             )
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(26.dp))
 
-            Text(
-                text = track.title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+            DotText(
+                text = track.title.uppercase(),
+                modifier = Modifier.fillMaxWidth(),
+                height = 26.dp,
+                color = Color.White
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
                 text = track.artist,
                 style = MaterialTheme.typography.bodyLarge,
@@ -135,32 +137,49 @@ fun PlayerScreen(
                 overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(Modifier.height(24.dp))
+            if (playback.error != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = playback.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFFE8454C),
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Spacer(Modifier.height(20.dp))
 
             Slider(
-                value = position,
-                onValueChange = { position = it },
+                value = fraction,
+                onValueChange = {
+                    dragging = true
+                    dragValue = it
+                },
+                onValueChangeFinished = {
+                    onSeek((dragValue * duration).toLong())
+                    dragging = false
+                },
                 colors = SliderDefaults.colors(
                     thumbColor = Color.White,
-                    activeTrackColor = Color.White,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.25f)
+                    activeTrackColor = Color(0xFFD71921),
+                    inactiveTrackColor = Color.White.copy(alpha = 0.20f)
                 )
             )
             Row(Modifier.fillMaxWidth()) {
                 Text(
-                    Demo.formatted((track.durationMs * position).toLong()),
+                    Demo.formatted((duration * fraction).toLong()),
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White.copy(alpha = 0.6f)
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    Demo.formatted(track.durationMs),
+                    Demo.formatted(duration),
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White.copy(alpha = 0.6f)
                 )
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(18.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -169,21 +188,31 @@ fun PlayerScreen(
             ) {
                 IconButtonBare(Icons.Rounded.Shuffle, {}, tint = Color.White.copy(alpha = 0.8f))
                 IconButtonBare(Icons.Rounded.SkipPrevious, onPrev, iconSize = 36.dp, tint = Color.White)
+
                 Box(
                     modifier = Modifier
                         .size(76.dp)
                         .clip(CircleShape)
-                        .background(Color.White),
+                        .background(Color(0xFFD71921)),
                     contentAlignment = Alignment.Center
                 ) {
-                    IconButtonBare(
-                        icon = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        onClick = onToggle,
-                        size = 76.dp,
-                        iconSize = 40.dp,
-                        tint = Color(0xFF0B0D11)
-                    )
+                    if (playback.loading) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            strokeWidth = 3.dp,
+                            modifier = Modifier.size(30.dp)
+                        )
+                    } else {
+                        IconButtonBare(
+                            icon = if (playback.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            onClick = onToggle,
+                            size = 76.dp,
+                            iconSize = 40.dp,
+                            tint = Color.White
+                        )
+                    }
                 }
+
                 IconButtonBare(Icons.Rounded.SkipNext, onNext, iconSize = 36.dp, tint = Color.White)
                 IconButtonBare(Icons.Rounded.Repeat, {}, tint = Color.White.copy(alpha = 0.8f))
             }
@@ -194,7 +223,7 @@ fun PlayerScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                IconButtonBare(Icons.Rounded.FavoriteBorder, onLike, tint = Color.White.copy(alpha = 0.8f))
+                IconButtonBare(Icons.Rounded.FavoriteBorder, {}, tint = Color.White.copy(alpha = 0.8f))
                 IconButtonBare(Icons.Rounded.Mic, {}, tint = Color.White.copy(alpha = 0.8f))
                 IconButtonBare(Icons.Rounded.QueueMusic, {}, tint = Color.White.copy(alpha = 0.8f))
                 IconButtonBare(Icons.Rounded.Share, {}, tint = Color.White.copy(alpha = 0.8f))
