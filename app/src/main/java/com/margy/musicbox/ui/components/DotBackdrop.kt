@@ -50,8 +50,8 @@ fun DotBackdrop(
     levels: FloatArray,
     playing: Boolean,
     modifier: Modifier = Modifier,
-    spacing: Dp = 11.dp,
-    dotRadius: Dp = 1.6.dp
+    spacing: Dp = 8.dp,
+    dotRadius: Dp = 1.35.dp
 ) {
     val spectrum = remember { FloatArray(28) }
     val phase = remember { mutableFloatStateOf(0f) }
@@ -132,10 +132,10 @@ fun DotBackdrop(
                         .coerceIn(0f, 1f)
                 }
 
-                val alpha = 0.085f + v * 0.82f
+                val alpha = 0.13f + v * 0.82f
                 val level = when {
-                    alpha < 0.20f -> 0
-                    alpha < 0.50f -> 1
+                    alpha < 0.26f -> 0
+                    alpha < 0.58f -> 1
                     else -> 2
                 }
                 val g = level + if (white) 0 else 3
