@@ -82,9 +82,9 @@ fun HomeScreen(
         item {
             Spacer(Modifier.height(16.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { NothingChip("ВСЕ", filter == null) { filter = null } }
+                item { NothingChip("ВСЕ", filter == null, onClick = { filter = null }) }
                 items(Source.entries) { src ->
-                    NothingChip(src.title, filter == src) { filter = src }
+                    NothingChip(src.title, filter == src, onClick = { filter = src })
                 }
             }
         }
