@@ -35,10 +35,10 @@ private const val GROUPS = 6
 private const val CAPACITY = 12000
 
 private val GROUP_COLORS = intArrayOf(
-    0x26F5F5F5.toInt(), // белый тусклый
+    0x30F5F5F5.toInt(), // белый тусклый
     0x7AF5F5F5.toInt(), // белый средний
     0xFFF5F5F5.toInt(), // белый яркий
-    0x26D71921.toInt(), // красный тусклый
+    0x36D71921.toInt(), // красный тусклый
     0x7AD71921.toInt(), // красный средний
     0xFFD71921.toInt()  // красный яркий
 )
@@ -132,7 +132,7 @@ fun DotBackdrop(
                         .coerceIn(0f, 1f)
                 }
 
-                val alpha = 0.13f + v * 0.82f
+                val alpha = 0.16f + v * 0.80f
                 val level = when {
                     alpha < 0.26f -> 0
                     alpha < 0.58f -> 1

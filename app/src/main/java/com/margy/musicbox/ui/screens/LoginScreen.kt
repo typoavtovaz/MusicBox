@@ -126,6 +126,12 @@ private fun YandexDeviceLogin(onDone: () -> Unit) {
         secondsLeft = device.expiresIn
         status = "открой ya.ru/device и введи код"
 
+        runCatching {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse("https://ya.ru/device"))
+            )
+        }
+
         val step = device.interval.coerceAtLeast(2)
         while (secondsLeft > 0) {
             delay(step * 1000L)
@@ -133,8 +139,9 @@ private fun YandexDeviceLogin(onDone: () -> Unit) {
             val token = try {
                 withContext(Dispatchers.IO) { YandexAuth.poll(device.deviceCode) }
             } catch (e: Exception) {
-                error = "ошибка входа: ${e.message}"
-                return@LaunchedEffect
+                // сеть моргнула — не повод сдаваться, пробуем дальше
+                status = "сеть моргнула, пробую снова…"
+                null
             }
             if (token != null) {
                 TokenStore.save(TokenStore.YANDEX, token)
