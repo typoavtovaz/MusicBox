@@ -6,7 +6,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,16 +20,23 @@ import androidx.compose.ui.unit.dp
 import com.margy.musicbox.core.model.Demo
 import com.margy.musicbox.core.model.Source
 import com.margy.musicbox.core.model.Track
-import com.margy.musicbox.ui.components.ChipSmall
 import com.margy.musicbox.ui.components.IconButtonBare
+import com.margy.musicbox.ui.components.NothingChip
 import com.margy.musicbox.ui.components.SectionTitle
 import com.margy.musicbox.ui.components.TileLarge
 import com.margy.musicbox.ui.components.TrackRow
+import com.margy.musicbox.ui.components.WaveCard
+import com.margy.musicbox.ui.theme.NothingRed
 
 @Composable
 fun HomeScreen(
     onTrackClick: (Track) -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    wavePlaying: Boolean,
+    waveLabel: String,
+    onWaveToggle: () -> Unit,
+    onWaveStop: () -> Unit,
+    onOpenWaveEditor: () -> Unit
 ) {
     var filter by remember { mutableStateOf<Source?>(null) }
     val visible = Demo.tracks.filter { filter == null || it.source == filter }
@@ -43,15 +49,15 @@ fun HomeScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "Доброй ночи",
+                        "MUSICBOX",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        "ютуб + яндекс + вк в одном месте",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        "ютуб · яндекс · вк",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = NothingRed
                     )
                 }
                 IconButtonBare(
@@ -63,11 +69,22 @@ fun HomeScreen(
         }
 
         item {
+            Spacer(Modifier.height(18.dp))
+            WaveCard(
+                playing = wavePlaying,
+                moodLabel = waveLabel,
+                onToggle = onWaveToggle,
+                onStop = onWaveStop,
+                onEdit = onOpenWaveEditor
+            )
+        }
+
+        item {
             Spacer(Modifier.height(16.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { ChipSmall("Все", filter == null) { filter = null } }
+                item { NothingChip("ВСЕ", filter == null) { filter = null } }
                 items(Source.entries) { src ->
-                    ChipSmall(src.title, filter == src) { filter = src }
+                    NothingChip(src.title, filter == src) { filter = src }
                 }
             }
         }

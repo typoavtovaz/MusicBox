@@ -37,12 +37,12 @@ import com.margy.musicbox.core.model.Source
 import com.margy.musicbox.core.model.Track
 
 private val Palette = listOf(
-    Color(0xFF7C5CFF) to Color(0xFF2B1B69),
-    Color(0xFF3DDC97) to Color(0xFF12463A),
-    Color(0xFFFF6B6B) to Color(0xFF5C1F32),
-    Color(0xFF32ADE6) to Color(0xFF12304D),
-    Color(0xFFFFB44C) to Color(0xFF5C3A12),
-    Color(0xFFB14CFF) to Color(0xFF3A1A5C)
+    Color(0xFFD71921) to Color(0xFF2A0305),
+    Color(0xFFF5F5F5) to Color(0xFF1A1A1A),
+    Color(0xFFB3151D) to Color(0xFF12080A),
+    Color(0xFF8A8A8A) to Color(0xFF0D0D0D),
+    Color(0xFFE8454C) to Color(0xFF2E0709),
+    Color(0xFF3A3A3A) to Color(0xFF050505)
 )
 
 fun gradientFor(seed: String): Brush {

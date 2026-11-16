@@ -17,9 +17,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.margy.musicbox.core.model.Demo
@@ -30,6 +32,8 @@ import com.margy.musicbox.ui.screens.LibraryScreen
 import com.margy.musicbox.ui.screens.PlayerScreen
 import com.margy.musicbox.ui.screens.SearchScreen
 import com.margy.musicbox.ui.screens.SettingsScreen
+import com.margy.musicbox.ui.screens.WaveEditorScreen
+import kotlin.random.Random
 
 private enum class Tab(val label: String, val icon: ImageVector) {
     Home("Главная", Icons.Rounded.Home),
@@ -45,6 +49,17 @@ fun AppRoot() {
     var playing by remember { mutableStateOf(false) }
     var playerOpen by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
+    var waveEditorOpen by remember { mutableStateOf(false) }
+
+    var wavePlaying by remember { mutableStateOf(false) }
+    val waveMoods = remember { mutableStateListOf<String>() }
+    var waveEnergy by remember { mutableFloatStateOf(0.6f) }
+
+    val waveLabel = if (waveMoods.isEmpty()) {
+        "подстроена под тебя"
+    } else {
+        "подстроена: " + waveMoods.joinToString(", ")
+    }
 
     fun play(track: Track) {
         current = track
@@ -69,6 +84,11 @@ fun AppRoot() {
         }
     }
 
+    fun startWave() {
+        wavePlaying = true
+        play(Demo.tracks[Random.nextInt(Demo.tracks.size)])
+    }
+
     if (playerOpen && current != null) {
         BackHandler { playerOpen = false }
         PlayerScreen(
@@ -79,6 +99,22 @@ fun AppRoot() {
             onNext = { next() },
             onPrev = { prev() },
             onLike = {}
+        )
+        return
+    }
+
+    if (waveEditorOpen) {
+        BackHandler { waveEditorOpen = false }
+        WaveEditorScreen(
+            onBack = { waveEditorOpen = false },
+            onStart = { startWave() },
+            selectedMoods = waveMoods,
+            onMoodsChange = { list ->
+                waveMoods.clear()
+                waveMoods.addAll(list)
+            },
+            energy = waveEnergy,
+            onEnergyChange = { waveEnergy = it }
         )
         return
     }
@@ -126,7 +162,22 @@ fun AppRoot() {
             when (tab) {
                 Tab.Home -> HomeScreen(
                     onTrackClick = { play(it) },
-                    onOpenSettings = { settingsOpen = true }
+                    onOpenSettings = { settingsOpen = true },
+                    wavePlaying = wavePlaying,
+                    waveLabel = waveLabel,
+                    onWaveToggle = {
+                        if (wavePlaying) {
+                            wavePlaying = false
+                            playing = false
+                        } else {
+                            startWave()
+                        }
+                    },
+                    onWaveStop = {
+                        wavePlaying = false
+                        playing = false
+                    },
+                    onOpenWaveEditor = { waveEditorOpen = true }
                 )
                 Tab.Search -> SearchScreen(
                     onTrackClick = { play(it); queue = Demo.tracks },
