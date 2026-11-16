@@ -36,6 +36,8 @@ fun SettingsScreen(onBack: () -> Unit) {
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
+            .statusBarsPadding()
+            .navigationBarsPadding()
             .padding(horizontal = 16.dp)
     ) {
         Spacer(Modifier.height(16.dp))

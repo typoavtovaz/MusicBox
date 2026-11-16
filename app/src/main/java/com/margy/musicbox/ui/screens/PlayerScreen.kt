@@ -69,8 +69,10 @@ fun PlayerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
+                .statusBarsPadding()
+                .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
-                .padding(top = 44.dp, bottom = 28.dp),
+                .padding(top = 8.dp, bottom = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Шапка
