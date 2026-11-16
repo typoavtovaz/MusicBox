@@ -1,0 +1,2 @@
+-dontwarn org.schabi.newpipe.**
+-keep class org.schabi.newpipe.** { *; }
