@@ -1,6 +1,18 @@
 package com.margy.musicbox.ui.screens
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -34,23 +46,28 @@ import com.margy.musicbox.data.provider.ProviderRegistry
 import com.margy.musicbox.ui.components.DotText
 import com.margy.musicbox.ui.components.NothingChip
 import com.margy.musicbox.ui.components.TrackRow
+import com.margy.musicbox.ui.theme.NothingLine
 import com.margy.musicbox.ui.theme.NothingRed
 import com.margy.musicbox.ui.theme.NothingWhite
 import kotlinx.coroutines.launch
 
-private val QuickQueries = listOf("phonk", "русский рэп", "night drive", "лоу-фай", "рок 90х")
+private val QuickQueries = listOf("Husky", "Zivert", "лоу-фай", "рок 90х", "phonk")
 
 @Composable
 fun SearchScreen(
     onTrackClick: (Track) -> Unit,
-    onResults: (List<Track>) -> Unit
+    onResults: (List<Track>) -> Unit,
+    onOpenLogin: (Source) -> Unit,
+    accountsVersion: Int
 ) {
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<Track>>(emptyList()) }
+    var bySource by remember { mutableStateOf<Map<Source, Int>>(emptyMap()) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val keyboard = LocalSoftwareKeyboardController.current
+    val loggedIn = ProviderRegistry.isAnyLoggedIn()
 
     fun runSearch(text: String) {
         val q = text.trim()
@@ -60,10 +77,12 @@ fun SearchScreen(
         error = null
         scope.launch {
             try {
-                val found = ProviderRegistry.search(Source.YOUTUBE, q)
-                results = found
-                onResults(found)
-                if (found.isEmpty()) error = "по «$q» ничего"
+                val found = ProviderRegistry.searchAll(q)
+                val flat = found.values.flatten()
+                results = flat
+                bySource = found.mapValues { it.value.size }
+                onResults(flat)
+                if (flat.isEmpty()) error = "по «$q» ничего"
             } catch (e: Exception) {
                 error = e.message ?: "поиск сдох"
             } finally {
@@ -90,7 +109,8 @@ fun SearchScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(16.dp)),
+                .clip(RoundedCornerShape(16.dp))
+                .border(1.dp, NothingLine, RoundedCornerShape(16.dp)),
             placeholder = { Text("трек, артист, альбом") },
             leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
             singleLine = true,
@@ -99,12 +119,53 @@ fun SearchScreen(
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
                 focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
+                unfocusedIndicatorColor = Color.Transparent,
+                cursorColor = NothingRed
             )
         )
 
         Spacer(Modifier.height(12.dp))
+
+        if (!loggedIn) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(NothingWhite.copy(alpha = 0.04f))
+                    .border(1.dp, NothingLine, RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Text("СНАЧАЛА ВОЙДИ", style = MaterialTheme.typography.labelMedium, color = NothingWhite)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Поиск идёт по Яндексу и ВК, для них нужен вход.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(NothingRed)
+                            .clickable { onOpenLogin(Source.YANDEX) }
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) { Text("ЯНДЕКС", color = NothingWhite, style = MaterialTheme.typography.labelMedium) }
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(NothingWhite)
+                            .clickable { onOpenLogin(Source.VK) }
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) { Text("ВК", color = Color.Black, style = MaterialTheme.typography.labelMedium) }
+                }
+            }
+            return@Column
+        }
 
         if (results.isEmpty() && !loading) {
             LazyRow(
@@ -146,14 +207,15 @@ fun SearchScreen(
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 item {
+                    val parts = bySource.entries.joinToString(" · ") { "${it.key.title}: ${it.value}" }
                     Text(
-                        "${results.size} результатов · YouTube",
+                        "${results.size} результатов · $parts",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
                     )
                 }
-                items(results) { track ->
+                items(results, key = { it.key }) { track ->
                     TrackRow(track = track, onClick = { onTrackClick(track) })
                 }
             }

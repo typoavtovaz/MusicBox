@@ -22,7 +22,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -33,7 +32,6 @@ import com.margy.musicbox.playback.PlaybackUi
 import com.margy.musicbox.ui.components.Artwork
 import com.margy.musicbox.ui.components.DotText
 import com.margy.musicbox.ui.components.IconButtonBare
-import com.margy.musicbox.ui.components.gradientFor
 import com.margy.musicbox.ui.components.sourceShort
 
 @Composable
@@ -55,22 +53,8 @@ fun PlayerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(gradientFor(track.key))
+            .background(Color.Black)
     ) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.Black.copy(alpha = 0.55f),
-                            Color.Black.copy(alpha = 0.92f),
-                            Color.Black
-                        )
-                    )
-                )
-        )
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -117,7 +101,7 @@ fun PlayerScreen(
                     .fillMaxWidth()
                     .aspectRatio(1f),
                 corner = 28.dp,
-                iconSize = 64.dp
+                cells = 13
             )
 
             Spacer(Modifier.height(26.dp))

@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import com.margy.musicbox.data.auth.TokenStore
 import com.margy.musicbox.playback.AudioReactive
 import com.margy.musicbox.playback.PlayerEngine
 import com.margy.musicbox.ui.AppRoot
@@ -25,6 +26,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         PlayerEngine.init(this)
+        TokenStore.init(this)
         askAudioPermission()
 
         setContent {

@@ -67,7 +67,7 @@ val NothingTypography = Typography(
 
 @Composable
 fun MusicBoxTheme(
-    dark: Boolean = isSystemInDarkTheme(),
+    dark: Boolean = true,
     content: @Composable () -> Unit
 ) {
     MaterialTheme(

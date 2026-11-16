@@ -17,18 +17,18 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import com.margy.musicbox.core.model.Demo
 import com.margy.musicbox.core.model.Source
 import com.margy.musicbox.core.model.Track
 import com.margy.musicbox.data.provider.ProviderRegistry
@@ -37,6 +37,7 @@ import com.margy.musicbox.playback.PlayerEngine
 import com.margy.musicbox.ui.components.MiniPlayer
 import com.margy.musicbox.ui.screens.HomeScreen
 import com.margy.musicbox.ui.screens.LibraryScreen
+import com.margy.musicbox.ui.screens.LoginScreen
 import com.margy.musicbox.ui.screens.PlayerScreen
 import com.margy.musicbox.ui.screens.SearchScreen
 import com.margy.musicbox.ui.screens.SettingsScreen
@@ -64,6 +65,8 @@ fun AppRoot() {
     var playerOpen by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var waveEditorOpen by remember { mutableStateOf(false) }
+    var loginSource by remember { mutableStateOf<Source?>(null) }
+    var accountsVersion by remember { mutableIntStateOf(0) }
 
     var wavePlaying by remember { mutableStateOf(false) }
     var waveStatus by remember { mutableStateOf<String?>(null) }
@@ -83,24 +86,30 @@ fun AppRoot() {
     }
 
     fun startWave() {
+        if (!ProviderRegistry.isAnyLoggedIn()) {
+            wavePlaying = false
+            waveStatus = "войди в Яндекс или ВК — без аккаунта нечего играть"
+            return
+        }
         wavePlaying = true
-        waveStatus = "сканирую сервисы…"
+        waveStatus = "подбираю под настроение…"
         scope.launch {
             val mood = waveMoods.toList().shuffled().take(2)
-            val query = (mood.ifEmpty { listOf("популярная музыка") }).joinToString(" ")
+                .ifEmpty { listOf("что-нибудь бодрое") }
+                .joinToString(" ")
             try {
-                val found = ProviderRegistry.search(Source.YOUTUBE, query)
+                val found = ProviderRegistry.wave(mood)
                 if (found.isEmpty()) {
                     wavePlaying = false
-                    waveStatus = "по «$query» нихуя не нашлось"
+                    waveStatus = "по «$mood» пусто"
                 } else {
-                    queue = found
+                    queue = found.shuffled()
                     waveStatus = null
-                    PlayerEngine.play(found.random())
+                    PlayerEngine.play(queue.first())
                 }
             } catch (e: Exception) {
                 wavePlaying = false
-                waveStatus = "волна сломалась: ${e.message ?: "ошибка сети"}"
+                waveStatus = "волна сломалась: ${e.message ?: "сеть"}"
             }
         }
     }
@@ -118,19 +127,33 @@ fun AppRoot() {
 
     fun stopWave() {
         wavePlaying = false
-        PlayerEngine.pause()
+        PlayerEngine.stop()
     }
 
     fun next() {
-        val list = queue.ifEmpty { Demo.tracks }
-        val idx = list.indexOfFirst { it.key == playback.track?.key }
-        if (idx >= 0) playTrack(list[(idx + 1) % list.size])
+        if (queue.isEmpty()) return
+        val idx = queue.indexOfFirst { it.key == playback.track?.key }
+        playTrack(queue[if (idx < 0) 0 else (idx + 1) % queue.size])
     }
 
     fun prev() {
-        val list = queue.ifEmpty { Demo.tracks }
-        val idx = list.indexOfFirst { it.key == playback.track?.key }
-        if (idx >= 0) playTrack(list[if (idx - 1 < 0) list.size - 1 else idx - 1])
+        if (queue.isEmpty()) return
+        val idx = queue.indexOfFirst { it.key == playback.track?.key }
+        playTrack(queue[if (idx <= 0) queue.size - 1 else idx - 1])
+    }
+
+    loginSource?.let { src ->
+        BackHandler { loginSource = null }
+        LoginScreen(
+            source = src,
+            onBack = { loginSource = null },
+            onDone = {
+                loginSource = null
+                accountsVersion++
+                waveStatus = "вошёл в ${src.title}"
+            }
+        )
+        return
     }
 
     if (playerOpen && playback.track != null) {
@@ -164,7 +187,11 @@ fun AppRoot() {
 
     if (settingsOpen) {
         BackHandler { settingsOpen = false }
-        SettingsScreen(onBack = { settingsOpen = false })
+        SettingsScreen(
+            onBack = { settingsOpen = false },
+            onLogin = { loginSource = it },
+            accountsVersion = accountsVersion
+        )
         return
     }
 
@@ -204,8 +231,14 @@ fun AppRoot() {
         Column(Modifier.fillMaxSize().padding(inner)) {
             when (tab) {
                 Tab.Home -> HomeScreen(
-                    onTrackClick = { playTrack(it) },
+                    onTrackClick = { track ->
+                        if (queue.none { it.key == track.key }) queue = listOf(track)
+                        playTrack(track)
+                    },
+                    onResults = { queue = it },
                     onOpenSettings = { settingsOpen = true },
+                    onOpenLogin = { loginSource = it },
+                    accountsVersion = accountsVersion,
                     wavePlaying = wavePlaying && playback.playing,
                     waveLevels = levels,
                     waveLabel = waveLabel,
@@ -215,12 +248,23 @@ fun AppRoot() {
                     onOpenWaveEditor = { waveEditorOpen = true }
                 )
                 Tab.Search -> SearchScreen(
-                    onTrackClick = { playTrack(it) },
-                    onResults = { queue = it }
+                    onTrackClick = { track ->
+                        if (queue.none { it.key == track.key }) queue = listOf(track)
+                        playTrack(track)
+                    },
+                    onResults = { queue = it },
+                    onOpenLogin = { loginSource = it },
+                    accountsVersion = accountsVersion
                 )
                 Tab.Library -> LibraryScreen(
-                    onTrackClick = { playTrack(it) },
-                    onOpenSettings = { settingsOpen = true }
+                    onTrackClick = { track ->
+                        if (queue.none { it.key == track.key }) queue = listOf(track)
+                        playTrack(track)
+                    },
+                    onResults = { queue = it },
+                    onOpenSettings = { settingsOpen = true },
+                    onOpenLogin = { loginSource = it },
+                    accountsVersion = accountsVersion
                 )
             }
         }
