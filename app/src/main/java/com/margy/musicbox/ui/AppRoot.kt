@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import com.margy.musicbox.core.model.Source
@@ -34,6 +35,7 @@ import com.margy.musicbox.core.model.Track
 import com.margy.musicbox.data.provider.ProviderRegistry
 import com.margy.musicbox.playback.AudioReactive
 import com.margy.musicbox.playback.PlayerEngine
+import com.margy.musicbox.ui.components.Backdrop
 import com.margy.musicbox.ui.components.MiniPlayer
 import com.margy.musicbox.ui.screens.HomeScreen
 import com.margy.musicbox.ui.screens.LibraryScreen
@@ -144,59 +146,68 @@ fun AppRoot() {
 
     loginSource?.let { src ->
         BackHandler { loginSource = null }
-        LoginScreen(
-            source = src,
-            onBack = { loginSource = null },
-            onDone = {
-                loginSource = null
-                accountsVersion++
-                waveStatus = "вошёл в ${src.title}"
-            }
-        )
+        Backdrop(levels, playback.playing) {
+            LoginScreen(
+                source = src,
+                onBack = { loginSource = null },
+                onDone = {
+                    loginSource = null
+                    accountsVersion++
+                    waveStatus = "вошёл в ${src.title}"
+                }
+            )
+        }
         return
     }
 
     if (playerOpen && playback.track != null) {
         BackHandler { playerOpen = false }
-        PlayerScreen(
-            playback = playback,
-            onClose = { playerOpen = false },
-            onToggle = { PlayerEngine.toggle() },
-            onSeek = { PlayerEngine.seekTo(it) },
-            onNext = { next() },
-            onPrev = { prev() }
-        )
+        Backdrop(levels, playback.playing) {
+            PlayerScreen(
+                playback = playback,
+                onClose = { playerOpen = false },
+                onToggle = { PlayerEngine.toggle() },
+                onSeek = { PlayerEngine.seekTo(it) },
+                onNext = { next() },
+                onPrev = { prev() }
+            )
+        }
         return
     }
 
     if (waveEditorOpen) {
         BackHandler { waveEditorOpen = false }
-        WaveEditorScreen(
-            onBack = { waveEditorOpen = false },
-            onStart = { startWave() },
-            selectedMoods = waveMoods,
-            onMoodsChange = { list ->
-                waveMoods.clear()
-                waveMoods.addAll(list)
-            },
-            energy = waveEnergy,
-            onEnergyChange = { waveEnergy = it }
-        )
+        Backdrop(levels, playback.playing) {
+            WaveEditorScreen(
+                onBack = { waveEditorOpen = false },
+                onStart = { startWave() },
+                selectedMoods = waveMoods,
+                onMoodsChange = { list ->
+                    waveMoods.clear()
+                    waveMoods.addAll(list)
+                },
+                energy = waveEnergy,
+                onEnergyChange = { waveEnergy = it }
+            )
+        }
         return
     }
 
     if (settingsOpen) {
         BackHandler { settingsOpen = false }
-        SettingsScreen(
-            onBack = { settingsOpen = false },
-            onLogin = { loginSource = it },
-            accountsVersion = accountsVersion
-        )
+        Backdrop(levels, playback.playing) {
+            SettingsScreen(
+                onBack = { settingsOpen = false },
+                onLogin = { loginSource = it },
+                accountsVersion = accountsVersion
+            )
+        }
         return
     }
 
+    Backdrop(levels, playback.playing) {
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         bottomBar = {
             Column {
                 playback.track?.let { t ->
@@ -268,5 +279,6 @@ fun AppRoot() {
                 )
             }
         }
+    }
     }
 }

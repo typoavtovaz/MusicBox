@@ -1,18 +1,26 @@
 package com.margy.musicbox.ui.screens
 
-import android.annotation.SuppressLint
-import android.graphics.Bitmap
-import android.webkit.WebResourceRequest
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -20,71 +28,42 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.unit.sp
 import com.margy.musicbox.core.model.Source
 import com.margy.musicbox.data.auth.TokenStore
+import com.margy.musicbox.data.auth.YandexAuth
 import com.margy.musicbox.ui.components.DotText
 import com.margy.musicbox.ui.theme.NothingLine
 import com.margy.musicbox.ui.theme.NothingRed
 import com.margy.musicbox.ui.theme.NothingWhite
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
-private const val YANDEX_CLIENT = "23cabbbdc6cd418abb4b39c32c41195e"
-private const val VK_CLIENT = "2685278"
-
-private fun authUrl(source: Source): String = when (source) {
-    Source.YANDEX ->
-        "https://oauth.yandex.ru/authorize?response_type=token&client_id=$YANDEX_CLIENT"
-    Source.VK ->
-        "https://oauth.vk.com/authorize?client_id=$VK_CLIENT&scope=audio,offline" +
-            "&redirect_uri=https://oauth.vk.com/blank.html&display=mobile&response_type=token&v=5.199"
-    Source.YOUTUBE -> ""
-}
-
-/**
- * Вход в сервис. Открываем их родную страницу логина, токен ловим из адреса.
- * Никаких паролей через нас — они вводятся на сайте сервиса.
- */
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun LoginScreen(
     source: Source,
     onBack: () -> Unit,
     onDone: () -> Unit
 ) {
-    var status by remember { mutableStateOf<String?>(null) }
-    var manual by remember { mutableStateOf("") }
-
-    fun accept(raw: String) {
-        val token = raw.substringAfter("access_token=", "")
-            .substringBefore("&")
-            .substringBefore("#")
-            .trim()
-            .ifBlank { raw.trim() }
-        if (token.length < 8) {
-            status = "токен не поймал, попробуй вставить руками"
-            return
-        }
-        TokenStore.save(
-            if (source == Source.YANDEX) TokenStore.YANDEX else TokenStore.VK,
-            token
-        )
-        onDone()
-    }
-
     Column(
         Modifier
             .fillMaxSize()
-            .background(Color.Black)
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
@@ -105,66 +84,203 @@ fun LoginScreen(
             )
         }
 
-        Text(
-            "Логинишься в ${source.title}. Пароль вводится на их сайте, к нам попадает только токен и хранится на телефоне.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
+        if (source == Source.YANDEX) {
+            YandexDeviceLogin(onDone = onDone)
+        } else {
+            ManualTokenLogin(
+                source = source,
+                hint = "ВК пока принимает только токен. Вставь его ниже — сохраню на телефоне.",
+                onDone = onDone
+            )
+        }
+    }
+}
 
-        Spacer(Modifier.height(8.dp))
+/**
+ * Яндекс: Device Flow. Показываем короткий код, пользователь подтверждает
+ * на ya.ru/device, мы сами забираем токен. Пароль никуда не пересылается.
+ */
+@Composable
+private fun YandexDeviceLogin(onDone: () -> Unit) {
+    val context = LocalContext.current
+    var attempt by remember { mutableIntStateOf(0) }
+    var code by remember { mutableStateOf<String?>(null) }
+    var status by remember { mutableStateOf("получаю код…") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var secondsLeft by remember { mutableIntStateOf(0) }
 
-        AndroidView(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp)
-                .border(1.dp, NothingLine, RoundedCornerShape(12.dp)),
-            factory = { ctx ->
-                WebView(ctx).apply {
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    settings.userAgentString =
-                        "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 " +
-                            "(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
-                    webViewClient = object : WebViewClient() {
-                        override fun shouldOverrideUrlLoading(
-                            view: WebView?,
-                            request: WebResourceRequest?
-                        ): Boolean {
-                            val u = request?.url?.toString().orEmpty()
-                            if (u.contains("access_token=")) {
-                                accept(u)
-                                return true
-                            }
-                            return false
-                        }
+    LaunchedEffect(attempt) {
+        if (attempt == 0) return@LaunchedEffect
+        error = null
+        code = null
+        status = "получаю код…"
 
-                        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                            if (url != null && url.contains("access_token=")) accept(url)
-                        }
-                    }
-                    loadUrl(authUrl(source))
-                }
+        val device = try {
+            withContext(Dispatchers.IO) { YandexAuth.requestCode() }
+        } catch (e: Exception) {
+            error = "яндекс не ответил: ${e.message}"
+            return@LaunchedEffect
+        }
+
+        code = device.userCode
+        secondsLeft = device.expiresIn
+        status = "открой ya.ru/device и введи код"
+
+        val step = device.interval.coerceAtLeast(2)
+        while (secondsLeft > 0) {
+            delay(step * 1000L)
+            secondsLeft -= step
+            val token = try {
+                withContext(Dispatchers.IO) { YandexAuth.poll(device.deviceCode) }
+            } catch (e: Exception) {
+                error = "ошибка входа: ${e.message}"
+                return@LaunchedEffect
             }
-        )
+            if (token != null) {
+                TokenStore.save(TokenStore.YANDEX, token)
+                status = "готово"
+                onDone()
+                return@LaunchedEffect
+            }
+        }
+        error = "код истёк, запроси новый"
+    }
 
-        Spacer(Modifier.height(10.dp))
-
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(Modifier.height(12.dp))
         Text(
-            "если окно не открылось — вставь токен вручную",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp)
+            "Яндекс Музыка",
+            style = MaterialTheme.typography.titleMedium,
+            color = NothingWhite
         )
         Spacer(Modifier.height(6.dp))
+        Text(
+            "Жми «получить код», открой ya.ru/device и введи код. Пароль останется на сайте Яндекса.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(Modifier.height(28.dp))
+
+        when {
+            error != null -> Text(
+                error ?: "",
+                color = NothingRed,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center
+            )
+
+            code == null -> CircularProgressIndicator(color = NothingRed)
+        }
+
+        code?.let { c ->
+            Text(
+                c.uppercase(),
+                color = NothingWhite,
+                fontSize = 44.sp,
+                letterSpacing = 8.sp,
+                style = MaterialTheme.typography.displaySmall
+            )
+            Spacer(Modifier.height(14.dp))
+            Text(
+                "осталось ${secondsLeft}с",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(20.dp))
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(NothingRed)
+                    .clickable {
+                        context.startActivity(
+                            Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://ya.ru/device")
+                            )
+                        )
+                    }
+                    .padding(horizontal = 22.dp, vertical = 12.dp)
+            ) {
+                Text("ОТКРЫТЬ YA.RU/DEVICE", color = NothingWhite, style = MaterialTheme.typography.labelMedium)
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        Text(
+            status,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(Modifier.height(22.dp))
+
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .border(1.dp, NothingLine, RoundedCornerShape(12.dp))
+                .clickable { attempt++ }
+                .padding(horizontal = 22.dp, vertical = 12.dp)
+        ) {
+            Text(
+                if (code == null) "ПОЛУЧИТЬ КОД" else "НОВЫЙ КОД",
+                color = NothingWhite,
+                style = MaterialTheme.typography.labelMedium
+            )
+        }
+    }
+}
+
+@Composable
+private fun ManualTokenLogin(
+    source: Source,
+    hint: String,
+    onDone: () -> Unit
+) {
+    var manual by remember { mutableStateOf("") }
+
+    fun accept(raw: String) {
+        val token = raw
+            .substringAfter("access_token=", raw)
+            .substringBefore("&")
+            .substringBefore("#")
+            .trim()
+        if (token.length < 8) return
+        TokenStore.save(
+            if (source == Source.YANDEX) TokenStore.YANDEX else TokenStore.VK,
+            token
+        )
+        onDone()
+    }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(Modifier.height(12.dp))
+        Text(source.title, style = MaterialTheme.typography.titleMedium, color = NothingWhite)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            hint,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(24.dp))
 
         OutlinedTextField(
             value = manual,
             onValueChange = { manual = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+            modifier = Modifier.fillMaxWidth(),
             placeholder = { Text("токен") },
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
@@ -178,27 +294,17 @@ fun LoginScreen(
             )
         )
 
+        Spacer(Modifier.height(12.dp))
         Box(
             Modifier
-                .padding(16.dp)
                 .fillMaxWidth()
                 .height(48.dp)
-                .background(if (manual.isBlank()) NothingLine else NothingRed, RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (manual.isBlank()) NothingLine else NothingRed)
                 .clickable(enabled = manual.isNotBlank()) { accept(manual) },
             contentAlignment = Alignment.Center
         ) {
-            Text("СОХРАНИТЬ ТОКЕН", color = NothingWhite, style = MaterialTheme.typography.labelLarge)
+            Text("СОХРАНИТЬ", color = NothingWhite, style = MaterialTheme.typography.labelLarge)
         }
-
-        status?.let {
-            Text(
-                it,
-                color = NothingRed,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
-        }
-
-        Spacer(Modifier.height(12.dp))
     }
 }

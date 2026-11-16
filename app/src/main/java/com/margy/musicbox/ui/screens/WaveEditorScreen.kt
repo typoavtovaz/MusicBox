@@ -75,7 +75,6 @@ fun WaveEditorScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
         Row(

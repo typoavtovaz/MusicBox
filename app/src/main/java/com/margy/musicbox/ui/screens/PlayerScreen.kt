@@ -53,7 +53,6 @@ fun PlayerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
     ) {
         Column(
             modifier = Modifier
